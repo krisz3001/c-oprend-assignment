@@ -42,7 +42,6 @@ void freeLines(char **lines, int lineCount)
 
 void addUsedPoem(char ***poems, int *capacity, int *nextIndex, char *poem)
 {
-    printf("Capacity: %d, Next index: %d\n", *capacity, *nextIndex);
     if (*nextIndex >= *capacity)
     {
         *capacity *= 2;
@@ -342,6 +341,11 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
                 capacity *= 2;
                 lines = realloc(lines, capacity * sizeof(char *));
             }
+            int lastCharIndex = strlen(line) - 1;
+            if (line[lastCharIndex] == '\n')
+            {
+                line[lastCharIndex] = '\0';
+            }
             lines[lineCount] = malloc(sizeof(line));
             strcpy(lines[lineCount], line);
             lineCount++;
@@ -374,11 +378,11 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
 
         int length = strlen(firstPoem) + 1;
         write(pipefd[1], &length, sizeof(int));
-        write(pipefd[1], firstPoem, strlen(firstPoem) + 1);
+        write(pipefd[1], firstPoem, length);
 
         length = strlen(secondPoem) + 1;
         write(pipefd[1], &length, sizeof(int));
-        write(pipefd[1], secondPoem, strlen(secondPoem) + 1);
+        write(pipefd[1], secondPoem, length);
 
         close(pipefd[1]);
 
@@ -417,12 +421,10 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
             exit(0);
         }
         read(pipefd[0], poems[0], length);
-        poems[0][length - 2] = '\0';
         printf("\nFirst poem: %s\n", poems[0]);
 
         read(pipefd[0], &length, sizeof(int));
         read(pipefd[0], poems[1], length);
-        poems[1][length - 2] = '\0';
         printf("Second poem: %s\n", poems[1]);
 
         srand(time(NULL));
@@ -452,11 +454,6 @@ int main()
     int nextIndex = 0;
     char **usedPoems = malloc(sizeof(char *) * capacity);
 
-    for (int i = 0; i < nextIndex; i++)
-    {
-        printf("%s\n", usedPoems[i]);
-    }
-
     do
     {
         chosen = showMenu();
@@ -476,12 +473,6 @@ int main()
             break;
         case 5:
             sprinke(&usedPoems, &capacity, &nextIndex);
-            printf("Capacity: %d, Next index: %d\n", capacity, nextIndex);
-            for (int i = 0; i < nextIndex; i++)
-            {
-                printf("Stored: %s\n", usedPoems[i]);
-            }
-
             break;
         case 6:
             return 0;
