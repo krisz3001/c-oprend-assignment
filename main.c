@@ -277,7 +277,7 @@ struct Message
     char mtext[POEM_LENGTH];
 };
 
-void sprinke(char ***usedPoems, int *storeCapacity, int *storeSize)
+void sprinke(char ***usedPoems, int *storeCapacity, int *storeSize, char *path)
 {
     system("clear");
     signal(SIGUSR1, signalHandler);
@@ -299,7 +299,7 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *storeSize)
 
     // MESSAGE QUEUE
 
-    key_t key = ftok("nyuszimama", 3556);
+    key_t key = ftok(path, 3556);
     int mqueue = msgget(key, 0666 | IPC_CREAT);
     if (mqueue < 0)
     {
@@ -312,7 +312,7 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *storeSize)
     if (pid > 0)
     {
         // Parent
-        printf("Child sent to Barátfa!\n");
+        printf("Parent: Child sent to Barátfa!\n");
         close(pipefd[0]);
         pause();
 
@@ -355,11 +355,11 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *storeSize)
                 usedCount++;
         }
 
-        printf("%d poems found, from which %d is already used.\n", lineCount, usedCount);
+        printf("Parent: %d poems found, from which %d is already used.\n", lineCount, usedCount);
 
         if (lineCount < 2 || lineCount - *storeSize < 2)
         {
-            printf("There are not enough unused poems to choose from!\n\n");
+            printf("Parent: There are not enough unused poems to choose from!\n\n");
             freeLines(lines, lineCount);
             int stop = -1;
             write(pipefd[1], &stop, sizeof(int));
@@ -393,14 +393,14 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *storeSize)
 
         // Receive the chosen poem
         struct Message message;
-        int status = msgrcv(mqueue, &message, sizeof(struct Message), 1, 0);
+        int status = msgrcv(mqueue, &message, sizeof(struct Message) - sizeof(long), 1, MSG_NOERROR);
         if (status < 0)
         {
             perror("msgrcv");
         }
         else
         {
-            printf("Mama received chosen poem: %s\n\n", message.mtext);
+            printf("Parent: Mama received chosen poem: %s\n\n", message.mtext);
             addUsedPoem(usedPoems, storeCapacity, storeSize, message.mtext);
         }
 
@@ -428,11 +428,11 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *storeSize)
             exit(0);
         }
         read(pipefd[0], poems[0], length);
-        printf("\nFirst poem: %s\n", poems[0]);
+        printf("\nChild: First poem is %s\n", poems[0]);
 
         read(pipefd[0], &length, sizeof(int));
         read(pipefd[0], poems[1], length);
-        printf("Second poem: %s\n\n", poems[1]);
+        printf("Child: Second poem is %s\n\n", poems[1]);
 
         srand(time(NULL));
         int chosen = rand() % 2;
@@ -446,13 +446,13 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *storeSize)
         strcpy(message.mtext, poems[chosen]);
         msgsnd(mqueue, &message, sizeof(struct Message), 0);
 
-        printf("%s\nSzabad-e locsolni?\n\n", poems[chosen]);
+        printf("Child: \n%s\nSzabad-e locsolni?\n\n", poems[chosen]);
 
         exit(0);
     }
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     system("clear");
     int chosen = -1;
@@ -479,7 +479,7 @@ int main()
             editPoem();
             break;
         case 5:
-            sprinke(&usedPoems, &capacity, &size);
+            sprinke(&usedPoems, &capacity, &size, argv[0]);
             break;
         case 6:
             return 0;
