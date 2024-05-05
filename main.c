@@ -40,22 +40,22 @@ void freeLines(char **lines, int lineCount)
     free(lines);
 }
 
-void addUsedPoem(char ***poems, int *capacity, int *nextIndex, char *poem)
+void addUsedPoem(char ***poems, int *capacity, int *size, char *poem)
 {
-    if (*nextIndex >= *capacity)
+    if (*size >= *capacity)
     {
         *capacity *= 2;
         *poems = realloc(*poems, *capacity * sizeof(char *));
     }
 
-    (*poems)[*nextIndex] = malloc(sizeof(poem));
-    strcpy((*poems)[*nextIndex], poem);
-    (*nextIndex)++;
+    (*poems)[*size] = malloc(sizeof(poem));
+    strcpy((*poems)[*size], poem);
+    (*size)++;
 }
 
-int isPoemUsed(char ***poems, int *nextIndex, char *poem)
+int isPoemUsed(char ***poems, int *size, char *poem)
 {
-    for (int i = 0; i < *nextIndex; i++)
+    for (int i = 0; i < *size; i++)
     {
         if (strcmp(poem, (*poems)[i]) == 0)
         {
@@ -268,7 +268,7 @@ void editPoem()
 
 void signalHandler(int signal)
 {
-    printf("Child arrived!\n");
+    printf("Child arrived!\n\n");
 }
 
 struct Message
@@ -277,7 +277,7 @@ struct Message
     char mtext[POEM_LENGTH];
 };
 
-void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
+void sprinke(char ***usedPoems, int *storeCapacity, int *storeSize)
 {
     system("clear");
     signal(SIGUSR1, signalHandler);
@@ -286,7 +286,7 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
     int size = sizeof(children) / sizeof(char *);
     srand(time(NULL));
     int selected = rand() % size;
-    printf("Selected child: %s\n", children[selected]);
+    printf("The selected child is %s!\n\n", children[selected]);
 
     // PIPE
     int pipefd[2];
@@ -305,10 +305,6 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
     {
         perror("msgget");
         return;
-    }
-    else
-    {
-        printf("Message queue created, Key: %i\n", key);
     }
 
     pid_t pid = fork();
@@ -352,17 +348,24 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
         }
         fclose(f);
 
-        if (lineCount < 2 || lineCount - *nextIndex < 2)
+        int usedCount = 0;
+        for (int i = 0; i < lineCount; i++)
         {
-            printf("There are not enough poems to choose from!\n");
+            if (isPoemUsed(usedPoems, storeSize, lines[i]))
+                usedCount++;
+        }
+
+        printf("%d poems found, from which %d is already used.\n", lineCount, usedCount);
+
+        if (lineCount < 2 || lineCount - *storeSize < 2)
+        {
+            printf("There are not enough unused poems to choose from!\n\n");
             freeLines(lines, lineCount);
             int stop = -1;
             write(pipefd[1], &stop, sizeof(int));
             close(pipefd[1]);
             return;
         }
-
-        printf("%d poems found!\n", lineCount);
 
         // Select two different poems
         int first;
@@ -371,7 +374,7 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
         {
             first = rand() % lineCount;
             second = rand() % lineCount;
-        } while (second == first || isPoemUsed(usedPoems, nextIndex, lines[first]) || isPoemUsed(usedPoems, nextIndex, lines[second]));
+        } while (second == first || isPoemUsed(usedPoems, storeSize, lines[first]) || isPoemUsed(usedPoems, storeSize, lines[second]));
 
         char *firstPoem = lines[first];
         char *secondPoem = lines[second];
@@ -397,12 +400,16 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
         }
         else
         {
-            printf("Chosen poem: %s\n", message.mtext);
-            addUsedPoem(usedPoems, storeCapacity, nextIndex, message.mtext);
+            printf("Mama received chosen poem: %s\n\n", message.mtext);
+            addUsedPoem(usedPoems, storeCapacity, storeSize, message.mtext);
+        }
+
+        if (msgctl(mqueue, IPC_RMID, NULL) < 0)
+        {
+            perror("msgctl");
         }
 
         freeLines(lines, lineCount);
-        printf("Sprinkling done!\n");
     }
     else
     {
@@ -425,7 +432,7 @@ void sprinke(char ***usedPoems, int *storeCapacity, int *nextIndex)
 
         read(pipefd[0], &length, sizeof(int));
         read(pipefd[0], poems[1], length);
-        printf("Second poem: %s\n", poems[1]);
+        printf("Second poem: %s\n\n", poems[1]);
 
         srand(time(NULL));
         int chosen = rand() % 2;
@@ -451,7 +458,7 @@ int main()
     int chosen = -1;
 
     int capacity = 2;
-    int nextIndex = 0;
+    int size = 0;
     char **usedPoems = malloc(sizeof(char *) * capacity);
 
     do
@@ -472,7 +479,7 @@ int main()
             editPoem();
             break;
         case 5:
-            sprinke(&usedPoems, &capacity, &nextIndex);
+            sprinke(&usedPoems, &capacity, &size);
             break;
         case 6:
             return 0;
@@ -483,5 +490,5 @@ int main()
         }
     } while (1);
 
-    freeLines(usedPoems, nextIndex);
+    freeLines(usedPoems, size);
 }

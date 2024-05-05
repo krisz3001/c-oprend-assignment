@@ -1,5 +1,4 @@
-asd
-gsd
 vers1
 vers2
-valami
+vers3
+vers4
